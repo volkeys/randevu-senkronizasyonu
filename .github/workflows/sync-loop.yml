@@ -1,0 +1,63 @@
+name: Randevu senkronizasyonu (saatlik döngü)
+
+# GitHub'ın saatlik zamanlaması ücretsiz depolarda saatlerce gecikiyor. Bu iş bunun yerine
+# ~6 saat açık kalır, her saat :07'de senkronize eder ve bitmeden kendini yeniden başlatır.
+# 2 saatte bir zamanlanmış başlatma, zincir koparsa döngüyü geri getirir (çalışan varsa sıraya girer).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */2 * * *'
+
+concurrency:
+  group: randevu-loop
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm test
+      - name: Her saat senkronize et
+        id: sync
+        run: |
+          if [ -z "$WIX_API_KEY" ]; then echo "::notice::WIX_API_KEY secret'ı yok, senkronizasyon atlandı"; exit 0; fi
+          end=$(( $(date +%s) + 345 * 60 ))
+          fail=0
+          while :; do
+            echo "::group::$(date -u +%FT%TZ) senkronizasyon"
+            node src/index.js || { fail=1; echo "::error::Senkronizasyon hatası (ayrıntı yukarıda)"; }
+            echo "::endgroup::"
+            now=$(date +%s)
+            next=$(( (now / 3600 + 1) * 3600 + 7 * 60 ))   # sonraki saat başı +7 dk (UTC)
+            [ "$next" -ge "$end" ] && break
+            sleep $(( next - now ))
+          done
+          exit $fail
+        env:
+          WIX_API_KEY: ${{ secrets.WIX_API_KEY }}
+          WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
+          WIX_BLOCK_SCHEDULE_LINKJOURNAL: ${{ secrets.WIX_BLOCK_SCHEDULE_LINKJOURNAL }}
+          WIX_BLOCK_SCHEDULE_BOKADIREKT: ${{ secrets.WIX_BLOCK_SCHEDULE_BOKADIREKT }}
+          LINKJOURNAL_API_URL: ${{ vars.LINKJOURNAL_LIVE == 'true' && secrets.LINKJOURNAL_API_URL || '' }}
+          LINKJOURNAL_API_KEY: ${{ secrets.LINKJOURNAL_API_KEY }}
+          LINKJOURNAL_IGNORE_ACTIVITIES: ${{ vars.LINKJOURNAL_IGNORE_ACTIVITIES }}
+          LINKJOURNAL_WRITE: ${{ vars.LINKJOURNAL_WRITE }}
+          BOKADIREKT_ICS_VOLKAN: ${{ vars.BOKADIREKT_LIVE == 'true' && secrets.BOKADIREKT_ICS_VOLKAN || '' }}
+          BOKADIREKT_ICS_DAVUT: ${{ vars.BOKADIREKT_LIVE == 'true' && secrets.BOKADIREKT_ICS_DAVUT || '' }}
+          SYNC_DAYS_AHEAD: ${{ vars.SYNC_DAYS_AHEAD }}
+          SYNC_MAX_CANCELS: ${{ vars.SYNC_MAX_CANCELS }}
+      - name: Sonraki döngüyü başlat
+        # Testler geçmezse döngü durur (GitHub e-posta gönderir); aksi halde zincir hep devam eder
+        if: always() && steps.sync.conclusion != 'skipped'
+        run: gh workflow run sync-loop.yml --ref main -R "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}

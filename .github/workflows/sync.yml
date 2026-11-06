@@ -1,0 +1,54 @@
+name: Randevu senkronizasyonu
+
+# Elle çalıştırma (deneme / tek seferlik). Saatlik senkronizasyonu sync-loop.yml yapar.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Sadece planı göster, hiçbir şey yazma'
+        type: boolean
+        default: true
+      setup_wix:
+        description: 'Tek seferlik: Wix blok takvimlerini oluştur (senkronizasyon yapmaz)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: randevu-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm test
+      - name: Senkronize et
+        run: |
+          # API anahtarı eklenene kadar saatlik çalışma hata vermeden atlanır
+          if [ -z "$WIX_API_KEY" ]; then echo "::notice::WIX_API_KEY secret'ı yok, senkronizasyon atlandı"; exit 0; fi
+          if [ "${{ inputs.setup_wix }}" = "true" ]; then node src/index.js --setup-wix; exit 0; fi
+          node src/index.js ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '--dry-run' || '' }}
+        env:
+          WIX_API_KEY: ${{ secrets.WIX_API_KEY }}
+          WIX_SITE_ID: ${{ secrets.WIX_SITE_ID }}
+          WIX_BLOCK_SCHEDULE_LINKJOURNAL: ${{ secrets.WIX_BLOCK_SCHEDULE_LINKJOURNAL }}
+          WIX_BLOCK_SCHEDULE_BOKADIREKT: ${{ secrets.WIX_BLOCK_SCHEDULE_BOKADIREKT }}
+          # Saatlik çalışma Link Journal'ı ancak LINKJOURNAL_LIVE=true değişkeni varsa kullanır; elle çalıştırma her zaman kullanır
+          LINKJOURNAL_API_URL: ${{ (github.event_name == 'workflow_dispatch' || vars.LINKJOURNAL_LIVE == 'true') && secrets.LINKJOURNAL_API_URL || '' }}
+          LINKJOURNAL_API_KEY: ${{ secrets.LINKJOURNAL_API_KEY }}
+          LINKJOURNAL_IGNORE_ACTIVITIES: ${{ vars.LINKJOURNAL_IGNORE_ACTIVITIES }}
+          LINKJOURNAL_WRITE: ${{ vars.LINKJOURNAL_WRITE }}
+          BOKADIREKT_API_URL: ${{ secrets.BOKADIREKT_API_URL }}
+          BOKADIREKT_API_KEY: ${{ secrets.BOKADIREKT_API_KEY }}
+          BOKADIREKT_ICS_URL: ${{ secrets.BOKADIREKT_ICS_URL }}
+          # Saatlik çalışma Boka Direkt'i ancak BOKADIREKT_LIVE=true değişkeni varsa kullanır; elle çalıştırma her zaman kullanır
+          BOKADIREKT_ICS_VOLKAN: ${{ (github.event_name == 'workflow_dispatch' || vars.BOKADIREKT_LIVE == 'true') && secrets.BOKADIREKT_ICS_VOLKAN || '' }}
+          BOKADIREKT_ICS_DAVUT: ${{ (github.event_name == 'workflow_dispatch' || vars.BOKADIREKT_LIVE == 'true') && secrets.BOKADIREKT_ICS_DAVUT || '' }}
+          BOKADIREKT_ICS_STAFF: ${{ vars.BOKADIREKT_ICS_STAFF }}
+          SYNC_DAYS_AHEAD: ${{ vars.SYNC_DAYS_AHEAD }}
+          SYNC_MAX_CANCELS: ${{ vars.SYNC_MAX_CANCELS }}

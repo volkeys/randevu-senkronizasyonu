@@ -1,0 +1,19 @@
+{
+  "_comment": "Her personel: Wix kaynak ID'si ile Link Journal ve Boka Direkt'teki ID/ad. linkjournal/bokadirekt alanlarını API erişimi gelince doldur.",
+  "staff": [
+    {
+      "key": "volkan",
+      "name": "Volkan BILMEZ",
+      "wixResourceId": "450e42ba-c665-45eb-afd8-eecb849803e6",
+      "linkjournal": 2,
+      "bokadirekt": null
+    },
+    {
+      "key": "davut",
+      "name": "Davut PIRO",
+      "wixResourceId": "fa1264a4-d9a2-4dbf-9743-c51d63e8072e",
+      "linkjournal": 3,
+      "bokadirekt": null
+    }
+  ]
+}

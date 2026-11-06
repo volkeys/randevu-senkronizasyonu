@@ -1,0 +1,16 @@
+{
+  "name": "randevu-senkronizasyonu",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wix Bookings, Link Journal och Boka Direkt: upptagna tider synkas varje timme",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "sync": "node src/index.js",
+    "sync:dry": "node src/index.js --dry-run",
+    "setup:wix": "node src/index.js --setup-wix",
+    "test": "node --test test/*.test.mjs"
+  }
+}

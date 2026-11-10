@@ -1,7 +1,7 @@
 name: Randevu senkronizasyonu (saatlik döngü)
 
-# GitHub'ın saatlik zamanlaması ücretsiz depolarda saatlerce gecikiyor. Bu iş bunun yerine
-# ~6 saat açık kalır, her saat :07'de senkronize eder ve bitmeden kendini yeniden başlatır.
+# GitHub'ın kendi zamanlaması ücretsiz depolarda saatlerce gecikiyor. Bu iş bunun yerine
+# ~6 saat açık kalır, her yarım saatte bir (:07 ve :37 UTC) senkronize eder ve bitmeden kendini yeniden başlatır.
 # 2 saatte bir zamanlanmış başlatma, zincir koparsa döngüyü geri getirir (çalışan varsa sıraya girer).
 on:
   workflow_dispatch:
@@ -37,7 +37,10 @@ jobs:
             node src/index.js || { fail=1; echo "::error::Senkronizasyon hatası (ayrıntı yukarıda)"; }
             echo "::endgroup::"
             now=$(date +%s)
-            next=$(( (now / 3600 + 1) * 3600 + 7 * 60 ))   # sonraki saat başı +7 dk (UTC)
+            # Sonraki :07 veya :37 (UTC) — yarım saatte bir
+            base=$(( now - now % 1800 ))
+            next=$(( base + 420 ))
+            while [ "$next" -le "$now" ]; do next=$(( next + 1800 )); done
             [ "$next" -ge "$end" ] && break
             sleep $(( next - now ))
           done
